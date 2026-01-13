@@ -46,6 +46,9 @@ struct rmtArgs
     std::string DataDir;
     std::string OutDir;
     float RemeshPctg;
+    bool UsePctg;
+    int RemeshCount;
+    bool UseCount;
     int RNG;
     bool Visualize;
 };
@@ -116,7 +119,12 @@ int ProcessMesh(const std::filesystem::path& File, const rmtArgs& Config) {
     Mesh.ComputeEdgesAndBoundaries();
 
     std::cout << "Computing Voronoi FPS with density " << Config.RemeshPctg << "..." << std::endl;
-    size_t NVRemesh = std::floor(Config.RemeshPctg * NVOrig);
+    size_t NVRemesh;
+    if (Config.UsePctg) {
+        NVRemesh = std::floor(Config.RemeshPctg * NVOrig);
+    } else if (Config.UseCount) {
+        NVRemesh = Config.RemeshCount;
+    }
     rmt::VoronoiPartitioning VPart(Mesh, Config.RNG);
     while (VPart.NumSamples() < NVRemesh)
         VPart.AddSample(VPart.FarthestVertex());
@@ -217,20 +225,35 @@ rmtArgs ParseArgs(int argc, const char* const argv[])
     Args.DataDir = "";
     Args.OutDir = "";
     Args.RemeshPctg = 1.0;
+    Args.UsePctg = false;
+    Args.RemeshCount = 0;
+    Args.UseCount = false;
     Args.Visualize = false;
     Args.RNG = 0;
 
     for (int i = 1; i < argc; ++i)
     {
         std::string argvi(argv[i]);
-        // if (argvi == "-f" || argvi == "--file")
-        // {
-        //     if (i == argc - 1)
-        //     {
-        //         Usage(argv[0], true);
-        //     }
-        //     return ParseFromFile(argv[i + 1]);
-        // }
+        if (argvi == "-p" || argvi == "--pctg")
+        {
+            if (i == argc - 1)
+            {
+                Usage(argv[0], true);
+            }
+            Args.RemeshPctg = std::stof(argv[++i]);
+            Args.UsePctg = true;
+            continue;
+        }
+        if (argvi == "-c" || argvi == "--count")
+        {
+            if (i == argc - 1)
+            {
+                Usage(argv[0], true);
+            }
+            Args.RemeshCount = std::stoi(argv[++i]);
+            Args.UseCount = true;
+            continue;
+        }
         if (argvi == "-o" || argvi == "--output")
         {
             if (i == argc - 1)
@@ -254,12 +277,13 @@ rmtArgs ParseArgs(int argc, const char* const argv[])
             Args.Visualize = true;
             continue;
         }
-        if (Args.DataDir.empty())
-            Args.DataDir = argvi;
-        else
-            Args.RemeshPctg = std::stof(argvi);
+        if (Args.DataDir.empty()) Args.DataDir = argvi;
     }
 
+    if (Args.UsePctg == Args.UseCount) {
+        std::cerr << "You must specify exactly one between vertex percentage and vertex count." << std::endl;
+        Usage(argv[0], true);
+    }
     if (Args.DataDir.empty())
     {
         std::cerr << "No data directory given." << std::endl;
@@ -289,13 +313,13 @@ void Usage(const std::string& Prog, bool IsError)
     out << std::endl;
     out << Prog << " usage:" << std::endl;
     out << std::endl;
-    out << "\t" << Prog << " data_dir remesh_pctg [-o|--output out_dir] [-s|--seed rng] [-v|--visual]" << std::endl;
-    out << "\t" << Prog << " -f|--file config_file" << std::endl;
+    out << "\t" << Prog << " data_dir [-p|--pctg remesh_pctg] [-c|--count remesh_count] [-o|--output out_dir] [-s|--seed rng] [-v|--visual]" << std::endl;
     out << "\t" << Prog << " -h|--help" << std::endl;
     out << std::endl;
     out << "Arguments details:" << std::endl;
     out << "\t- data_dir is the directory containing the mesh dataset;" << std::endl;
-    out << "\t- remesh_pctg is the fraction of input vertices you want in the remesh;" << std::endl;
+    out << "\t- -p|--pctg sets the fraction of input vertices you want in the remesh (one between this and -c must be specified);" << std::endl;
+    out << "\t- -c|--count explicitly sets the vertex count of the remesh (one between this and -p must be specified);" << std::endl;
     out << "\t- -o|--output sets the output directory for the processed dataset;" << std::endl;
     out << "\t- -s|--seed sets the seed for random generation (used for selecting remesh vertices);" << std::endl;
     out << "\t- -v|--visual if provided, the script will show Voronoi decompositions via Polyscope as it runs;" << std::endl;
@@ -306,90 +330,3 @@ void Usage(const std::string& Prog, bool IsError)
         exit(-1);
 }
 
-
-// rmtArgs ParseFromFile(const std::string& Filename)
-// {
-//     std::ifstream Stream;
-//     Stream.open(Filename, std::ios::in);
-//     if (!Stream.is_open())
-//     {
-//         std::cerr << "Cannot open file " << Filename << " for reading." << std::endl;
-//         exit(-1);
-//     }
-
-//     nlohmann::json j;
-//     try
-//     {
-//         Stream >> j;
-//     }
-//     catch(const std::exception& e)
-//     {
-//         std::cerr << e.what() << '\n';
-//         exit(-1);
-//     }
-    
-    
-//     Stream.close();
-
-//     if (!j.contains("input_mesh"))
-//     {
-//         std::cerr << "Configuration file must contain the \'input_mesh\' attribute." << std::endl;
-//         exit(-1);
-//     }
-//     if (!j.contains("num_samples"))
-//     {
-//         std::cerr << "Configuration file must contain the \'num_samples\' attribute." << std::endl;
-//         exit(-1);
-//     }
-
-//     if (!j["input_mesh"].is_string())
-//     {
-//         std::cerr << "\'input_mesh\' attribute must be a string." << std::endl;
-//         exit(-1);
-//     }
-//     if (!j["num_samples"].is_number_integer())
-//     {
-//         std::cerr << "\'num_samples\' attribute must be an integer numeric value." << std::endl;
-//         exit(-1);
-//     }
-
-//     rmtArgs Args;
-//     Args.InMesh = j["input_mesh"];
-//     Args.NumSamples = j["num_samples"];
-//     Args.Resampling = false;
-//     Args.Evaluate = false;
-//     Args.OutMesh = std::filesystem::path(Args.InMesh).filename().string();
-//     Args.OutMesh = (std::filesystem::current_path() / std::filesystem::path(Args.OutMesh)).string();
-
-//     if (j.contains("resampling"))
-//     {
-//         if (!j["resampling"].is_boolean())
-//         {
-//             std::cerr << "When provided, \'resampling\' attribute must be boolean." << std::endl;
-//             exit(-1);
-//         }
-//         Args.Resampling = j["resampling"];
-//     }
-
-//     if (j.contains("evaluate"))
-//     {
-//         if (!j["evaluate"].is_boolean())
-//         {
-//             std::cerr << "When provided, \'evaluate\' attribute must be boolean." << std::endl;
-//             exit(-1);
-//         }
-//         Args.Evaluate = j["evaluate"];
-//     }
-
-//     if (j.contains("out_mesh"))
-//     {
-//         if (!j["out_mesh"].is_string())
-//         {
-//             std::cerr << "When provided, \'out_mesh\' attribute must be a string." << std::endl;
-//             exit(-1);
-//         }
-//         Args.OutMesh = j["out_mesh"];
-//     }
-
-//     return Args;
-// }
