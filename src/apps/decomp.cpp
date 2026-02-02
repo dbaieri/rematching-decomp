@@ -51,6 +51,7 @@ struct rmtArgs
     bool UseCount;
     int RNG;
     bool Visualize;
+    unsigned int MaxIter;
 };
 
 rmtArgs ParseArgs(int argc, const char* const argv[]);
@@ -74,25 +75,28 @@ int main(int argc, const char* const argv[])
     }
 
     std::filesystem::path DataDir(Args.DataDir);
+    int Return;
     for (auto const& Content : std::filesystem::directory_iterator{DataDir}) {
 
         if (!std::filesystem::is_regular_file(Content)) continue;
 
         t = 0.0f;
         StartTimer();
-        if (ProcessMesh(Content, Args) != 0) {
+        Return = ProcessMesh(Content, Args);
+        if (Return == -1) {        // Breaking error
             return 1;
+        } else if (Return == -2) { // Skip shape: Flat Union refinement failed
+            continue;
+        } else {
+            t = StopTimer();
+            TotTime += t;
         }
-        t = StopTimer();
-        TotTime += t;
 
     }
 
     std::cout << "Program terminated successfully in " << TotTime << "s." << std::endl;
     return 0;
 }
-
-
 
 int ProcessMesh(const std::filesystem::path& File, const rmtArgs& Config) {
 
@@ -131,11 +135,22 @@ int ProcessMesh(const std::filesystem::path& File, const rmtArgs& Config) {
 
     std::cout << "Refining sampling to ensure closed ball property... " << std::endl;
     rmt::FlatUnion FU(Mesh, VPart);
+    unsigned int NumIters = 0;
+    bool RefinementError = false;
     do
     {
+        if (Config.MaxIter > 0 && NumIters >= Config.MaxIter) {
+            RefinementError = true;
+            break;
+        }
         FU.DetermineRegions();
         FU.ComputeTopologies();
+        NumIters++;
     } while (!FU.FixIssues());
+    if (RefinementError) {
+        std::cerr << "Cannot ensure closed ball property on this shape! Skipping" << std::endl;
+        return -2;
+    }
     size_t NVRefined = VPart.NumSamples();
     
     /* Compute cluster index for each high-res vertex */
@@ -229,6 +244,7 @@ rmtArgs ParseArgs(int argc, const char* const argv[])
     Args.RemeshCount = 0;
     Args.UseCount = false;
     Args.Visualize = false;
+    Args.MaxIter = 0;
     Args.RNG = 0;
 
     for (int i = 1; i < argc; ++i)
@@ -272,6 +288,15 @@ rmtArgs ParseArgs(int argc, const char* const argv[])
             Args.RNG = std::stoi(argv[++i]);
             continue;
         }
+        if (argvi == "-m" || argvi == "--max_iter")
+        {
+            if (i == argc - 1)
+            {
+                Usage(argv[0], true);
+            }
+            Args.MaxIter = std::stoi(argv[++i]);
+            continue;
+        }
         if (argvi == "-v" || argvi == "--visual")
         {
             Args.Visualize = true;
@@ -313,7 +338,7 @@ void Usage(const std::string& Prog, bool IsError)
     out << std::endl;
     out << Prog << " usage:" << std::endl;
     out << std::endl;
-    out << "\t" << Prog << " data_dir [-p|--pctg remesh_pctg] [-c|--count remesh_count] [-o|--output out_dir] [-s|--seed rng] [-v|--visual]" << std::endl;
+    out << "\t" << Prog << " data_dir [-p|--pctg remesh_pctg] [-c|--count remesh_count] [-o|--output out_dir] [-s|--seed rng] [-v|--visual] [-m|--max_iter max_refinement_steps]" << std::endl;
     out << "\t" << Prog << " -h|--help" << std::endl;
     out << std::endl;
     out << "Arguments details:" << std::endl;
@@ -324,6 +349,7 @@ void Usage(const std::string& Prog, bool IsError)
     out << "\t- -s|--seed sets the seed for random generation (used for selecting remesh vertices);" << std::endl;
     out << "\t- -v|--visual if provided, the script will show Voronoi decompositions via Polyscope as it runs;" << std::endl;
     out << "\t- -f|--file sets the arguments using the content of config_file." << std::endl;
+    out << "\t- -m|--max_iter sets the maximum number of iterations for flat union refinement before failure." << std::endl;
     out << "\t- -h|--help prints this message." << std::endl;
 
     if (IsError)
