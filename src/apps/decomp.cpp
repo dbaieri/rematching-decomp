@@ -173,7 +173,7 @@ int ProcessMesh(const std::filesystem::path& File, const rmtArgs& Config) {
     Eigen::MatrixXd VV;
     Eigen::MatrixXi FF;
     rmt::MeshFromVoronoi(Mesh.GetVertices(), Mesh.GetTriangles(), VPart, VV, FF);
-    rmt::CleanUp(VV, FF);
+    // rmt::CleanUp(VV, FF);
     size_t NVFinal = VV.rows();
     size_t NTFinal = FF.rows();
 
