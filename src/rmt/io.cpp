@@ -14,6 +14,8 @@
 #include <filesystem>
 #include <algorithm>
 #include <cctype>
+#include <iostream>
+#include <fstream>
 
 #include <unsupported/Eigen/SparseExtra>
 
@@ -84,4 +86,30 @@ bool rmt::ExportMesh(const std::string & Filename,
                          _DummyDouble, _DummyDouble, _DummyInt, 
                          Feats, {"VoronoiRegion", "IsCenter"}, _dummy_header);
 
+}
+
+bool rmt::ExportVoronoi(const std::string& Filename,
+                        const std::vector<std::vector<unsigned int>>& Regions) 
+{
+    std::ofstream OutFile(Filename, std::ios::out | std::ios::binary);
+    if (!OutFile.is_open()) 
+        return false;
+
+    // 1. Write the size of the outer vector
+    size_t OuterSize = Regions.size();
+    OutFile.write(reinterpret_cast<const char*>(&OuterSize), sizeof(OuterSize));
+
+    // 2. Iterate through each inner vector
+    for (const auto& Region : Regions) {
+        // a. Write the size of the current inner vector
+        size_t InnerSize = Region.size();
+        OutFile.write(reinterpret_cast<const char*>(&InnerSize), sizeof(InnerSize));
+
+        // b. Write the raw data of the inner vector
+        if (InnerSize > 0) 
+            OutFile.write(reinterpret_cast<const char*>(Region.data()), InnerSize * sizeof(int));
+    }
+
+    OutFile.close();
+    return true;
 }

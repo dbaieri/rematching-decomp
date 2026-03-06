@@ -33,5 +33,8 @@ bool ExportMesh(const std::string& Filename,
 
 bool ExportWeightmap(const std::string& Filename,
                      const Eigen::SparseMatrix<double>& WM);
+
+bool ExportVoronoi(const std::string& Filename,
+                   const std::vector<std::vector<unsigned int>>& Regions);
     
 } // namespace rmt

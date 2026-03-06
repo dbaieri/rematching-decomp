@@ -72,3 +72,15 @@ add_executable(Decomp "${CMAKE_SOURCE_DIR}/src/apps/decomp.cpp")
 target_link_libraries(Decomp RMT)
 target_link_libraries(Decomp polyscope)
 set_target_properties(Decomp PROPERTIES CXX_STANDARD 17)
+
+
+# Per-Vertex Geodesic Voronoi regions
+add_executable(Voronoi "${CMAKE_SOURCE_DIR}/src/apps/voronoi.cpp")
+target_link_libraries(Voronoi RMT)
+set_target_properties(Voronoi PROPERTIES CXX_STANDARD 17)
+
+
+# Approximate Per-Vertex Geodesic Voronoi regions
+add_executable(Regions "${CMAKE_SOURCE_DIR}/src/apps/regions.cpp")
+target_link_libraries(Regions RMT)
+set_target_properties(Regions PROPERTIES CXX_STANDARD 17)

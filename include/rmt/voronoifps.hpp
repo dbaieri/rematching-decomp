@@ -14,6 +14,7 @@
 #include <rmt/graph.hpp>
 #include <rmt/mesh.hpp>
 #include <cut/cut.hpp>
+#include <unordered_set>
 
 
 namespace rmt
@@ -21,7 +22,8 @@ namespace rmt
     
 class VoronoiPartitioning
 {
-private:
+protected:
+    bool isEmpty;
     rmt::Graph m_G;
     std::vector<int> m_Samples;
     Eigen::VectorXi m_Partitions;
@@ -31,7 +33,9 @@ private:
 
 public:
     VoronoiPartitioning(const rmt::Mesh& M);
+    VoronoiPartitioning(const rmt::Mesh& M, bool empty);
     VoronoiPartitioning(const rmt::Mesh& M, int seed);
+    VoronoiPartitioning(const rmt::Mesh& M, bool empty, int seed);
     VoronoiPartitioning(rmt::VoronoiPartitioning&& VP);
     rmt::VoronoiPartitioning& operator=(rmt::VoronoiPartitioning&& VP);
     ~VoronoiPartitioning();
@@ -46,7 +50,25 @@ public:
     const std::vector<int>& GetSamples() const;
 
     int FarthestVertex() const;
-    void AddSample(int NewSample);
+    virtual void AddSample(int NewSample);
+};
+
+class VoronoiPartitioningExplicit : public VoronoiPartitioning
+{
+
+protected:
+    std::vector<std::unordered_set<int>> ExplicitRegions;
+
+public:
+    VoronoiPartitioningExplicit(const rmt::Mesh& M);
+    VoronoiPartitioningExplicit(const rmt::Mesh& M, bool empty);
+    VoronoiPartitioningExplicit(const rmt::Mesh& M, int seed);
+    VoronoiPartitioningExplicit(const rmt::Mesh& M, bool empty, int seed);
+    VoronoiPartitioningExplicit(rmt::VoronoiPartitioningExplicit&& VP);
+    ~VoronoiPartitioningExplicit();
+
+    void AddSample(int NewSample) override;
+    const std::vector<std::unordered_set<int>>& GetRegions() const;
 };
 
 
