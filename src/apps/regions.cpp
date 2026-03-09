@@ -174,7 +174,7 @@ int ProcessMesh(const std::filesystem::path& File, const rmtArgs& Config) {
                 FaceCount[Face]++;
                 if (FaceCount[Face] == 3 && !FaceAdded[Face]) {
                     // std::cout << "\t Aggregating face: " << Face << std::endl;
-                    AccumulatedArea += FaceAreas[Face];
+                    AccumulatedArea += FaceAreas[Face] / 2.0;
                     FaceAdded[Face] = true;
                     // std::cout << "\t Current area: " << AccumulatedArea << std::endl;
                     if ((float)AccumulatedArea >= Config.Area) {
@@ -214,8 +214,8 @@ int ProcessMesh(const std::filesystem::path& File, const rmtArgs& Config) {
         if (*ptr > Max) Max = *ptr;
     }
 
-    std::cout << "Patch size stats:" << std::endl;
-    std::cout << "\tMean: " << ((float)Sum / Mesh.NumVertices()) << " Min: " << Min << " Max: " << Max << std::endl;
+    std::cout << "\nPatch size stats:" << std::endl;
+    std::cout << "\t\tMean: " << ((float)Sum / Mesh.NumVertices()) << " Min: " << Min << " Max: " << Max << std::endl;
 
     std::cout << std::endl << "Exporting... " << std::endl;
     if (!rmt::ExportVoronoi(Config.OutFile, PerVertexPartitions)) {
