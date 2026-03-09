@@ -35,6 +35,8 @@ bool ExportWeightmap(const std::string& Filename,
                      const Eigen::SparseMatrix<double>& WM);
 
 bool ExportVoronoi(const std::string& Filename,
-                   const std::vector<std::vector<unsigned int>>& Regions);
+                   const std::vector<std::vector<unsigned int>>& VertexRegions,
+                   const std::vector<std::vector<unsigned int>>& FaceRegions,
+                   const Eigen::MatrixXi& Faces);
     
 } // namespace rmt

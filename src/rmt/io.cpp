@@ -89,25 +89,51 @@ bool rmt::ExportMesh(const std::string & Filename,
 }
 
 bool rmt::ExportVoronoi(const std::string& Filename,
-                        const std::vector<std::vector<unsigned int>>& Regions) 
+                        const std::vector<std::vector<unsigned int>>& VertexRegions,
+                        const std::vector<std::vector<unsigned int>>& FaceRegions,
+                        const Eigen::MatrixXi& Faces) 
 {
     std::ofstream OutFile(Filename, std::ios::out | std::ios::binary);
     if (!OutFile.is_open()) 
         return false;
 
     // 1. Write the size of the outer vector
-    size_t OuterSize = Regions.size();
+    size_t OuterSize = VertexRegions.size();
     OutFile.write(reinterpret_cast<const char*>(&OuterSize), sizeof(OuterSize));
 
     // 2. Iterate through each inner vector
-    for (const auto& Region : Regions) {
-        // a. Write the size of the current inner vector
-        size_t InnerSize = Region.size();
-        OutFile.write(reinterpret_cast<const char*>(&InnerSize), sizeof(InnerSize));
+    for (int i = 0; i < OuterSize; i++) {
+        auto VRegion = VertexRegions[i];
+
+        // a. Write the number of vertices
+        size_t NumVertices = VRegion.size();
+        OutFile.write(reinterpret_cast<const char*>(&NumVertices), sizeof(NumVertices));
 
         // b. Write the raw data of the inner vector
-        if (InnerSize > 0) 
-            OutFile.write(reinterpret_cast<const char*>(Region.data()), InnerSize * sizeof(int));
+        if (NumVertices > 0) 
+            OutFile.write(reinterpret_cast<const char*>(VRegion.data()), NumVertices * sizeof(int));
+
+        // c. Write the number of faces
+        auto FRegion = FaceRegions[i];
+        size_t NumFaces = FRegion.size();
+        OutFile.write(reinterpret_cast<const char*>(&NumFaces), sizeof(NumFaces));
+
+        // d. Remap and write faces
+        std::unordered_map<unsigned int, unsigned int> Map(NumVertices);
+        for (int j = 0; j < NumVertices; j++) 
+            Map.emplace(VRegion[j], j);
+        
+        std::vector<unsigned int> FaceRemap(NumFaces * 3);
+        for (int j = 0; j < NumFaces; j++) {
+            auto Face = Faces.row(j);
+            FaceRemap.push_back(Map[Face[0]]);
+            FaceRemap.push_back(Map[Face[1]]);
+            FaceRemap.push_back(Map[Face[2]]);
+        } 
+
+        if (NumFaces > 0) 
+            OutFile.write(reinterpret_cast<const char*>(FaceRemap.data()), NumFaces * 3 * sizeof(int));
+
     }
 
     OutFile.close();

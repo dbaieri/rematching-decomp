@@ -114,6 +114,7 @@ int ProcessMesh(const std::filesystem::path& File, const rmtArgs& Config) {
     auto Faces = Mesh.GetTriangles();
     rmt::Graph m_G(Vertices, Faces);
     std::vector<std::vector<unsigned int>> PerVertexPartitions(Mesh.NumVertices());
+    std::vector<std::vector<unsigned int>> FacesPerPartition(Mesh.NumVertices());
     std::vector<unsigned int> PatchSizes(Mesh.NumVertices());
 
     std::vector<double> Distances(Mesh.NumVertices(), std::numeric_limits<int>::max()); 
@@ -176,6 +177,7 @@ int ProcessMesh(const std::filesystem::path& File, const rmtArgs& Config) {
                     // std::cout << "\t Aggregating face: " << Face << std::endl;
                     AccumulatedArea += FaceAreas[Face] / 2.0;
                     FaceAdded[Face] = true;
+                    FacesPerPartition[v0].push_back(Face);
                     // std::cout << "\t Current area: " << AccumulatedArea << std::endl;
                     if ((float)AccumulatedArea >= Config.Area) {
                         // std::cout << "\t Hit area target" << std::endl;
@@ -218,7 +220,7 @@ int ProcessMesh(const std::filesystem::path& File, const rmtArgs& Config) {
     std::cout << "\t\tMean: " << ((float)Sum / Mesh.NumVertices()) << " Min: " << Min << " Max: " << Max << std::endl;
 
     std::cout << std::endl << "Exporting... " << std::endl;
-    if (!rmt::ExportVoronoi(Config.OutFile, PerVertexPartitions)) {
+    if (!rmt::ExportVoronoi(Config.OutFile, PerVertexPartitions, FacesPerPartition, Faces)) {
         std::cerr << "Cannot write output." << std::endl;
         return -1;
     }

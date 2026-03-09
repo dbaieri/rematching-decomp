@@ -213,11 +213,11 @@ int ProcessMesh(const std::filesystem::path& File, const rmtArgs& Config) {
     std::string FileName = File.stem().string();
     std::filesystem::path OutDir(Config.OutDir);
     std::filesystem::path VoronoiOutFile = OutDir / (FileName + "_regions.ply");
-    if (!rmt::ExportVoronoi(VoronoiOutFile.string(), PerVertexPartitions))
-    {
-        std::cerr << "Cannot write output." << std::endl;
-        return -1;
-    }
+    // if (!rmt::ExportVoronoi(VoronoiOutFile.string(), PerVertexPartitions))
+    // {
+    //     std::cerr << "Cannot write output." << std::endl;
+    //     return -1;
+    // }
 
     return 0;
 }
