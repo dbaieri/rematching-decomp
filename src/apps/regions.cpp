@@ -115,7 +115,6 @@ int ProcessMesh(const std::filesystem::path& File, const rmtArgs& Config) {
     rmt::Graph m_G(Vertices, Faces);
     std::vector<std::vector<unsigned int>> PerVertexPartitions(Mesh.NumVertices());
     std::vector<std::vector<unsigned int>> FacesPerPartition(Mesh.NumVertices());
-    std::vector<unsigned int> PatchSizes(Mesh.NumVertices());
 
     std::vector<double> Distances(Mesh.NumVertices(), std::numeric_limits<int>::max()); 
     std::vector<bool> Visited(Mesh.NumVertices(), false);
@@ -165,7 +164,6 @@ int ProcessMesh(const std::filesystem::path& File, const rmtArgs& Config) {
 
             Visited[v] = true;
             PerVertexPartitions[v0].push_back(v); // Add visited vertex to the region
-            PatchSizes[v0]++;
 
             // update incident faces
             auto IncidentFaces = PerVertexFaces[v];
@@ -210,10 +208,11 @@ int ProcessMesh(const std::filesystem::path& File, const rmtArgs& Config) {
     }
     
     int Sum = 0, Min = std::numeric_limits<int>::max(), Max = 0;
-    for (auto ptr = PatchSizes.begin(); ptr != PatchSizes.end(); ptr++) {
-        Sum += *ptr;
-        if (*ptr < Min) Min = *ptr;
-        if (*ptr > Max) Max = *ptr;
+    for (int i = 0; i < Mesh.NumVertices(); i++) {
+        auto Size = PerVertexPartitions[i].size();
+        Sum += Size;
+        if (Size < Min) Min = Size;
+        if (Size > Max) Max = Size;
     }
 
     std::cout << "\nPatch size stats:" << std::endl;

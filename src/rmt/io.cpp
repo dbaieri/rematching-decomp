@@ -99,7 +99,7 @@ bool rmt::ExportVoronoi(const std::string& Filename,
 
     // 1. Write the size of the outer vector
     size_t OuterSize = VertexRegions.size();
-    OutFile.write(reinterpret_cast<const char*>(&OuterSize), sizeof(OuterSize));
+    OutFile.write(reinterpret_cast<const char*>(&OuterSize), sizeof(int));
 
     // 2. Iterate through each inner vector
     for (int i = 0; i < OuterSize; i++) {
@@ -107,32 +107,32 @@ bool rmt::ExportVoronoi(const std::string& Filename,
 
         // a. Write the number of vertices
         size_t NumVertices = VRegion.size();
-        OutFile.write(reinterpret_cast<const char*>(&NumVertices), sizeof(NumVertices));
+        OutFile.write(reinterpret_cast<char*>(&NumVertices), sizeof(int));
 
         // b. Write the raw data of the inner vector
         if (NumVertices > 0) 
-            OutFile.write(reinterpret_cast<const char*>(VRegion.data()), NumVertices * sizeof(int));
+            OutFile.write(reinterpret_cast<char*>(VRegion.data()), NumVertices * sizeof(int));
 
         // c. Write the number of faces
         auto FRegion = FaceRegions[i];
         size_t NumFaces = FRegion.size();
-        OutFile.write(reinterpret_cast<const char*>(&NumFaces), sizeof(NumFaces));
+        OutFile.write(reinterpret_cast<char*>(&NumFaces), sizeof(int));
 
         // d. Remap and write faces
-        std::unordered_map<unsigned int, unsigned int> Map(NumVertices);
+        std::unordered_map<unsigned int, unsigned int> Map;
         for (int j = 0; j < NumVertices; j++) 
             Map.emplace(VRegion[j], j);
         
-        std::vector<unsigned int> FaceRemap(NumFaces * 3);
+        std::vector<unsigned int> FaceRemap;
         for (int j = 0; j < NumFaces; j++) {
-            auto Face = Faces.row(j);
+            auto Face = Faces.row(FRegion[j]);
             FaceRemap.push_back(Map[Face[0]]);
             FaceRemap.push_back(Map[Face[1]]);
             FaceRemap.push_back(Map[Face[2]]);
         } 
 
         if (NumFaces > 0) 
-            OutFile.write(reinterpret_cast<const char*>(FaceRemap.data()), NumFaces * 3 * sizeof(int));
+            OutFile.write(reinterpret_cast<char*>(FaceRemap.data()), NumFaces * 3 * sizeof(int));
 
     }
 
