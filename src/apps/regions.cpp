@@ -49,6 +49,7 @@ struct rmtArgs
     std::string InFile;
     std::string OutFile;
     float Area;
+    bool Update;
 };
 
 rmtArgs ParseArgs(int argc, const char* const argv[]);
@@ -223,6 +224,12 @@ int ProcessMesh(const std::filesystem::path& File, const rmtArgs& Config) {
         std::cerr << "Cannot write output." << std::endl;
         return -1;
     }
+    if (Config.Update) {
+        if (!rmt::ExportMesh(Config.InFile, Mesh.GetVertices(), Mesh.GetTriangles())) {
+            std::cerr << "Cannot write output." << std::endl;
+            return -1;
+        }
+    }
 
     return 0;
 }
@@ -261,6 +268,7 @@ rmtArgs ParseArgs(int argc, const char* const argv[])
     Args.InFile = "";
     Args.OutFile = "";
     Args.Area = 1.f/1000.f;
+    Args.Update = false;
 
     for (int i = 1; i < argc; ++i)
     {
@@ -281,6 +289,11 @@ rmtArgs ParseArgs(int argc, const char* const argv[])
                 Usage(argv[0], true);
             }
             Args.OutFile = argv[++i];
+            continue;
+        }
+        if (argvi == "-u" || argvi == "--update")
+        {
+            Args.Update = true;
             continue;
         }
         if (Args.InFile.empty()) Args.InFile = argvi;
@@ -310,13 +323,14 @@ void Usage(const std::string& Prog, bool IsError)
     out << std::endl;
     out << Prog << " usage:" << std::endl;
     out << std::endl;
-    out << "\t" << Prog << " in_file [-o|--output out_dir] [-a|--area area]" << std::endl;
+    out << "\t" << Prog << " in_file [-o|--output out_dir] [-a|--area area] [-u|--update]" << std::endl;
     out << "\t" << Prog << " -h|--help" << std::endl;
     out << std::endl;
     out << "Arguments details:" << std::endl;
     out << "\t- in_file is the input mesh file;" << std::endl;
     out << "\t- -a|--area sets the desired area for computed regions;" << std::endl;
     out << "\t- -o|--output sets the output file for the processed mesh;" << std::endl;
+    out << "\t- -u|--update overwrites the input mesh with its repaired version;" << std::endl;
     out << "\t- -f|--file sets the arguments using the content of config_file." << std::endl;
     out << "\t- -h|--help prints this message." << std::endl;
 
