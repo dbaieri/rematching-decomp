@@ -15,6 +15,7 @@
 
 #include <rmt/rmt.hpp>
 #include <rmt/graph.hpp>
+#include <rmt/voronoifps.hpp>
 
 #include <igl/readOBJ.h>
 #include <igl/writeOBJ.h>
@@ -49,7 +50,11 @@ struct rmtArgs
     std::string InFile;
     std::string OutFile;
     float Area;
+    float AreaMin;
+    float AreaMax;
+    float Subsample;
     bool Update;
+    bool SampleArea;
 };
 
 rmtArgs ParseArgs(int argc, const char* const argv[]);
@@ -114,8 +119,6 @@ int ProcessMesh(const std::filesystem::path& File, const rmtArgs& Config) {
     auto Vertices = Mesh.GetVertices();
     auto Faces = Mesh.GetTriangles();
     rmt::Graph m_G(Vertices, Faces);
-    std::vector<std::vector<unsigned int>> PerVertexPartitions(Mesh.NumVertices());
-    std::vector<std::vector<unsigned int>> FacesPerPartition(Mesh.NumVertices());
 
     std::vector<double> Distances(Mesh.NumVertices(), std::numeric_limits<int>::max()); 
     std::vector<bool> Visited(Mesh.NumVertices(), false);
@@ -129,12 +132,34 @@ int ProcessMesh(const std::filesystem::path& File, const rmtArgs& Config) {
         PerVertexFaces[Face[2]].push_back(j);
     }
     
-    int Steps = 0;
-    double AccumulatedArea;
-    bool EarlyStop;
-    for (int v0 = 0; v0 < Mesh.NumVertices(); v0++) {
+    std::vector<int> PatchCenters;
+    if (Config.Subsample < 1.0f) {
+        size_t NVRemesh = std::floor(Config.Subsample * Mesh.NumVertices());
+        rmt::VoronoiPartitioning VPart(Mesh);
+        int Sample;
+        while (VPart.NumSamples() < NVRemesh) {
+            Sample = VPart.FarthestVertex();
+            VPart.AddSample(Sample);
+            PatchCenters.push_back(Sample);
+        }            
+    } else {
+        for (int i = 0; i < Mesh.NumVertices(); i++)
+            PatchCenters.push_back(i);
+    }
+    std::vector<std::vector<unsigned int>> PerVertexPartitions;
+    std::vector<std::vector<unsigned int>> FacesPerPartition;
 
-        if (v0 > 0) {
+    int Steps = 0;
+    double AccumulatedArea, AreaTarget;
+    std::vector<double> i{Config.AreaMin, Config.AreaMax};
+    std::vector<double> w{0.2, 0.8};
+    std::piecewise_linear_distribution<> AreaSampler{i.begin(), i.end(), w.begin()};
+    std::random_device RandDev;
+    std::mt19937 Gen{RandDev()};
+    bool EarlyStop;
+    for (int v0 : PatchCenters) {
+
+        if (v0 != PatchCenters[0]) {
             std::fill(Distances.begin(), Distances.end(), std::numeric_limits<int>::max());
             std::fill(Visited.begin(), Visited.end(), false);
             std::fill(FaceCount.begin(), FaceCount.end(), 0);
@@ -147,12 +172,17 @@ int ProcessMesh(const std::filesystem::path& File, const rmtArgs& Config) {
         Distances[v0] = 0;
         Queue.emplace(0.0, v0);
         AccumulatedArea = 0.0;
+        AreaTarget = Config.Area;
+        if (Config.SampleArea) 
+            AreaTarget = AreaSampler(Gen);
         EarlyStop = false;
+
+        PerVertexPartitions.push_back({});
+        FacesPerPartition.push_back({});
 
         // std::cout << "Vertex " << v0 << std::endl;
 
         while (!Queue.empty()) {
-
             std::pair<double, int> Next = Queue.top();
             Queue.pop();
             double W = Next.first;
@@ -164,7 +194,7 @@ int ProcessMesh(const std::filesystem::path& File, const rmtArgs& Config) {
             // std::cout << "\t New vertex: " << v << " with gdist " << W << std::endl;
 
             Visited[v] = true;
-            PerVertexPartitions[v0].push_back(v); // Add visited vertex to the region
+            PerVertexPartitions[Steps].push_back(v); // Add visited vertex to the region
 
             // update incident faces
             auto IncidentFaces = PerVertexFaces[v];
@@ -176,9 +206,9 @@ int ProcessMesh(const std::filesystem::path& File, const rmtArgs& Config) {
                     // std::cout << "\t Aggregating face: " << Face << std::endl;
                     AccumulatedArea += FaceAreas[Face] / 2.0;
                     FaceAdded[Face] = true;
-                    FacesPerPartition[v0].push_back(Face);
+                    FacesPerPartition[Steps].push_back(Face);
                     // std::cout << "\t Current area: " << AccumulatedArea << std::endl;
-                    if ((float)AccumulatedArea >= Config.Area) {
+                    if ((float)AccumulatedArea >= AreaTarget) {
                         // std::cout << "\t Hit area target" << std::endl;
                         EarlyStop = true;
                         break;
@@ -209,7 +239,7 @@ int ProcessMesh(const std::filesystem::path& File, const rmtArgs& Config) {
     }
     
     int Sum = 0, Min = std::numeric_limits<int>::max(), Max = 0;
-    for (int i = 0; i < Mesh.NumVertices(); i++) {
+    for (int i = 0; i < PerVertexPartitions.size(); i++) {
         auto Size = PerVertexPartitions[i].size();
         Sum += Size;
         if (Size < Min) Min = Size;
@@ -217,7 +247,7 @@ int ProcessMesh(const std::filesystem::path& File, const rmtArgs& Config) {
     }
 
     std::cout << "\nPatch size stats:" << std::endl;
-    std::cout << "\t\tMean: " << ((float)Sum / Mesh.NumVertices()) << " Min: " << Min << " Max: " << Max << std::endl;
+    std::cout << "\tMean: " << ((float)Sum / Mesh.NumVertices()) << " Min: " << Min << " Max: " << Max << std::endl;
 
     std::cout << std::endl << "Exporting... " << std::endl;
     if (!rmt::ExportVoronoi(Config.OutFile, PerVertexPartitions, FacesPerPartition, Faces)) {
@@ -269,6 +299,10 @@ rmtArgs ParseArgs(int argc, const char* const argv[])
     Args.OutFile = "";
     Args.Area = 1.f/1000.f;
     Args.Update = false;
+    Args.Subsample = 1.0f;
+    Args.SampleArea = false;
+    Args.AreaMin = 0.0f;
+    Args.AreaMax = 1.0f;
 
     for (int i = 1; i < argc; ++i)
     {
@@ -282,6 +316,17 @@ rmtArgs ParseArgs(int argc, const char* const argv[])
             Args.Area = std::stof(argv[++i]);
             continue;
         }
+        if (argvi == "-b" || argvi == "--bounds")
+        {
+            if (i == argc - 1)
+            {
+                Usage(argv[0], true);
+            }
+            Args.SampleArea = true;
+            Args.AreaMin = std::stof(argv[++i]);
+            Args.AreaMax = std::stof(argv[++i]);
+            continue;
+        }
         if (argvi == "-o" || argvi == "--output")
         {
             if (i == argc - 1)
@@ -289,6 +334,15 @@ rmtArgs ParseArgs(int argc, const char* const argv[])
                 Usage(argv[0], true);
             }
             Args.OutFile = argv[++i];
+            continue;
+        }
+        if (argvi == "-s" || argvi == "--subsample")
+        {
+            if (i == argc - 1)
+            {
+                Usage(argv[0], true);
+            }
+            Args.Subsample = std::stof(argv[++i]);
             continue;
         }
         if (argvi == "-u" || argvi == "--update")
@@ -323,12 +377,14 @@ void Usage(const std::string& Prog, bool IsError)
     out << std::endl;
     out << Prog << " usage:" << std::endl;
     out << std::endl;
-    out << "\t" << Prog << " in_file [-o|--output out_dir] [-a|--area area] [-u|--update]" << std::endl;
+    out << "\t" << Prog << " in_file [-o|--output out_file] [-s|--subsample fraction] [-a|--area area] [-b|--bounds a_min a_max] [-u|--update]" << std::endl;
     out << "\t" << Prog << " -h|--help" << std::endl;
     out << std::endl;
     out << "Arguments details:" << std::endl;
     out << "\t- in_file is the input mesh file;" << std::endl;
     out << "\t- -a|--area sets the desired area for computed regions;" << std::endl;
+    out << "\t- -b|--bounds sets min/max area values for sampling;" << std::endl;
+    out << "\t- -s|--subsample sets the fraction of shape vertices to sample with FPS;" << std::endl;
     out << "\t- -o|--output sets the output file for the processed mesh;" << std::endl;
     out << "\t- -u|--update overwrites the input mesh with its repaired version;" << std::endl;
     out << "\t- -f|--file sets the arguments using the content of config_file." << std::endl;

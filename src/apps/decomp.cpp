@@ -43,7 +43,7 @@ double StopTimer();
 
 struct rmtArgs
 {
-    std::string DataDir;
+    std::string InFile;
     std::string OutDir;
     float RemeshPctg;
     bool UsePctg;
@@ -74,27 +74,13 @@ int main(int argc, const char* const argv[])
         std::filesystem::create_directories(OutDir);
     }
 
-    std::filesystem::path DataDir(Args.DataDir);
-    int Return;
-    for (auto const& Content : std::filesystem::directory_iterator{DataDir}) {
+    std::filesystem::path InPath(Args.InFile);
+    t = 0.0f;
+    StartTimer();
+    int Return = ProcessMesh(InPath, Args);
+    t = StopTimer();
 
-        if (!std::filesystem::is_regular_file(Content)) continue;
-
-        t = 0.0f;
-        StartTimer();
-        Return = ProcessMesh(Content, Args);
-        if (Return == -1) {        // Breaking error
-            return 1;
-        } else if (Return == -2) { // Skip shape: Flat Union refinement failed
-            continue;
-        } else {
-            t = StopTimer();
-            TotTime += t;
-        }
-
-    }
-
-    std::cout << "Program terminated successfully in " << TotTime << "s." << std::endl;
+    std::cout << "Program terminated successfully in " << t << "s." << std::endl;
     return 0;
 }
 
@@ -237,7 +223,7 @@ rmtArgs ParseArgs(int argc, const char* const argv[])
     }
 
     rmtArgs Args;
-    Args.DataDir = "";
+    Args.InFile = "";
     Args.OutDir = "";
     Args.RemeshPctg = 1.0;
     Args.UsePctg = false;
@@ -302,16 +288,16 @@ rmtArgs ParseArgs(int argc, const char* const argv[])
             Args.Visualize = true;
             continue;
         }
-        if (Args.DataDir.empty()) Args.DataDir = argvi;
+        if (Args.InFile.empty()) Args.InFile = argvi;
     }
 
     if (Args.UsePctg == Args.UseCount) {
         std::cerr << "You must specify exactly one between vertex percentage and vertex count." << std::endl;
         Usage(argv[0], true);
     }
-    if (Args.DataDir.empty())
+    if (Args.InFile.empty())
     {
-        std::cerr << "No data directory given." << std::endl;
+        std::cerr << "No input file given." << std::endl;
         Usage(argv[0], true);
     }
     if (Args.RemeshPctg == -1)
@@ -321,8 +307,8 @@ rmtArgs ParseArgs(int argc, const char* const argv[])
     }
     if (Args.OutDir.empty())
     {
-        std::filesystem::path OutDir = std::filesystem::path(Args.DataDir) / "decomp";
-        Args.OutDir = OutDir.string();
+        auto InPath = std::filesystem::path(Args.InFile);
+        Args.OutDir = InPath.parent_path().string();
     }
 
     return Args;
@@ -338,14 +324,14 @@ void Usage(const std::string& Prog, bool IsError)
     out << std::endl;
     out << Prog << " usage:" << std::endl;
     out << std::endl;
-    out << "\t" << Prog << " data_dir [-p|--pctg remesh_pctg] [-c|--count remesh_count] [-o|--output out_dir] [-s|--seed rng] [-v|--visual] [-m|--max_iter max_refinement_steps]" << std::endl;
+    out << "\t" << Prog << " in_file [-p|--pctg remesh_pctg] [-c|--count remesh_count] [-o|--output out_dir] [-s|--seed rng] [-v|--visual] [-m|--max_iter max_refinement_steps]" << std::endl;
     out << "\t" << Prog << " -h|--help" << std::endl;
     out << std::endl;
     out << "Arguments details:" << std::endl;
-    out << "\t- data_dir is the directory containing the mesh dataset;" << std::endl;
+    out << "\t- in_file is the input mesh file;" << std::endl;
     out << "\t- -p|--pctg sets the fraction of input vertices you want in the remesh (one between this and -c must be specified);" << std::endl;
     out << "\t- -c|--count explicitly sets the vertex count of the remesh (one between this and -p must be specified);" << std::endl;
-    out << "\t- -o|--output sets the output directory for the processed dataset;" << std::endl;
+    out << "\t- -o|--output sets the directory for program output;" << std::endl;
     out << "\t- -s|--seed sets the seed for random generation (used for selecting remesh vertices);" << std::endl;
     out << "\t- -v|--visual if provided, the script will show Voronoi decompositions via Polyscope as it runs;" << std::endl;
     out << "\t- -f|--file sets the arguments using the content of config_file." << std::endl;
