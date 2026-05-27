@@ -133,15 +133,22 @@ int ProcessMesh(const std::filesystem::path& File, const rmtArgs& Config) {
     }
     
     std::vector<int> PatchCenters;
-    if (Config.Subsample < 1.0f) {
-        size_t NVRemesh = std::floor(Config.Subsample * Mesh.NumVertices());
+    if (Config.Subsample != 1.0f) {
+        size_t NVRemesh;
+        if (Config.Subsample > 1.0f) 
+            NVRemesh = std::floor(Config.Subsample);
+        else
+            NVRemesh = std::floor(Config.Subsample * Mesh.NumVertices());
+            
         rmt::VoronoiPartitioning VPart(Mesh);
+        PatchCenters.push_back(VPart.GetSample(0));
         int Sample;
         while (VPart.NumSamples() < NVRemesh) {
             Sample = VPart.FarthestVertex();
             VPart.AddSample(Sample);
             PatchCenters.push_back(Sample);
-        }            
+        }  
+        std::cout << "Num centers: " << PatchCenters.size() << std::endl;          
     } else {
         for (int i = 0; i < Mesh.NumVertices(); i++)
             PatchCenters.push_back(i);
