@@ -25,7 +25,7 @@ find_package(Threads REQUIRED)
 
 
 # Add Polyscope to submodules to compile
-add_subdirectory("${CMAKE_SOURCE_DIR}/ext/polyscope")
+# add_subdirectory("${CMAKE_SOURCE_DIR}/ext/polyscope")
 
 
 # Include rematching library
@@ -68,10 +68,10 @@ target_link_libraries(BatchRemesh RMT)
 set_target_properties(BatchRemesh PROPERTIES CXX_STANDARD 17)
 
 # Geodesic Voronoi decomposition
-add_executable(Decomp "${CMAKE_SOURCE_DIR}/src/apps/decomp.cpp")
-target_link_libraries(Decomp RMT)
-target_link_libraries(Decomp polyscope)
-set_target_properties(Decomp PROPERTIES CXX_STANDARD 17)
+# add_executable(Decomp "${CMAKE_SOURCE_DIR}/src/apps/decomp.cpp")
+# target_link_libraries(Decomp RMT)
+# target_link_libraries(Decomp polyscope)
+# set_target_properties(Decomp PROPERTIES CXX_STANDARD 17)
 
 
 # # Per-Vertex Geodesic Voronoi regions

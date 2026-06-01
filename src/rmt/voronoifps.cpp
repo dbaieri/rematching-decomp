@@ -30,7 +30,8 @@ rmt::VoronoiPartitioning::VoronoiPartitioning(const rmt::Mesh& M, bool empty, in
     if (isEmpty) {
         return;
     }
-    std::mt19937 Eng(seed);
+    std::random_device rd;
+    std::mt19937 Eng(rd());
     std::uniform_int_distribution<int> Distr(0, M.NumVertices() - 1);
     int FirstSample = Distr(Eng);
     m_Samples.emplace_back(FirstSample);
